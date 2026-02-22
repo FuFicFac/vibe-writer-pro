@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        'seahawks-navy': '#002244',
-        'seahawks-green': '#69BE28',
-        'seahawks-gray': '#A5ACAF',
+        'seahawks-navy': 'rgb(var(--seahawks-navy) / <alpha-value>)',
+        'seahawks-green': 'rgb(var(--seahawks-green) / <alpha-value>)',
+        'seahawks-gray': 'rgb(var(--seahawks-gray) / <alpha-value>)',
       }
     },
   },

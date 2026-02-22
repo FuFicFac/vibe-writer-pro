@@ -20,15 +20,16 @@ import clsx from 'clsx';
 import useStore from '../store/useStore';
 import { generateText } from '../services/aiService';
 
-export default function EditorArea({ documentId, isSecondary }) {
+export default function EditorArea({ documentId, isSecondary, findNavigationRequest = null }) {
     const {
-        documents, updateDocumentContent, createDocument,
+        documents, updateDocumentContent, updateDocumentName, createDocument,
         activeProjectId, folders,
         setActiveDocument, setActiveDocumentSecondary,
         personas, settings
     } = useStore();
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const [documentTitleDraft, setDocumentTitleDraft] = useState('');
     const [expandDialog, setExpandDialog] = useState({
         isOpen: false,
         from: null,
@@ -56,7 +57,7 @@ export default function EditorArea({ documentId, isSecondary }) {
         content: activeDocument?.content || '',
         editorProps: {
             attributes: {
-                class: 'prose prose-invert prose-lg focus:outline-none max-w-none prose-headings:font-serif prose-p:font-serif',
+                class: 'prose vw-editor-prose prose-lg focus:outline-none max-w-none prose-headings:font-serif prose-p:font-serif',
             },
         },
         onUpdate: ({ editor }) => {
@@ -76,6 +77,25 @@ export default function EditorArea({ documentId, isSecondary }) {
             editor.commands.setContent(activeDocument.content, false);
         }
     }, [documentId, editor, activeDocument]);
+
+    // Keep title input synced to the active document
+    useEffect(() => {
+        setDocumentTitleDraft(activeDocument?.name || '');
+    }, [activeDocument?.id, activeDocument?.name]);
+
+    // Sync find/replace navigation requests into the editor selection
+    useEffect(() => {
+        if (!editor || !documentId || !findNavigationRequest) return;
+        if (findNavigationRequest.docId !== documentId) return;
+        if (!findNavigationRequest.query) return;
+
+        // Delay one frame so selection can apply after document switches / content sync.
+        const rafId = window.requestAnimationFrame(() => {
+            jumpToFindOccurrenceInEditor(editor, findNavigationRequest);
+        });
+
+        return () => window.cancelAnimationFrame(rafId);
+    }, [editor, documentId, findNavigationRequest]);
 
     // AI Action Handlers
     const handleAiAction = async (promptGenerator, customSystemPrompt = null) => {
@@ -199,6 +219,89 @@ export default function EditorArea({ documentId, isSecondary }) {
         }
     };
 
+    const handleQuickAiContinue = async () => {
+        if (!editor || !activeDocument || isGenerating) return;
+
+        const quickContinueEnabled = Boolean(settings?.quickAiContinueEnabled);
+        if (!quickContinueEnabled) return;
+
+        const { from, to } = editor.state.selection;
+        if (from !== to) return;
+
+        const textBeforeCursor = editor.state.doc.textBetween(0, from, '\n', '\n');
+        const textAfterCursor = editor.state.doc.textBetween(to, editor.state.doc.content.size, '\n', '\n');
+        const trimmedBefore = textBeforeCursor.trim();
+
+        if (!trimmedBefore) {
+            alert('Write a little context first, then press ` to have AI continue from your cursor.');
+            return;
+        }
+
+        const beforeContext = textBeforeCursor.slice(-2500);
+        const afterContext = textAfterCursor.slice(0, 500);
+
+        setIsGenerating(true);
+        try {
+            const resultText = await generateText({
+                prompt: [
+                    'Continue the user’s writing exactly at the cursor position.',
+                    'Write the next 2 sentences only (not a paragraph).',
+                    'Preserve the same voice, tense, POV, pacing, and style.',
+                    'Do not add commentary, labels, quotation marks around the answer, or explanations.',
+                    'Return only the continuation text to insert.',
+                    '',
+                    'Context before cursor (most recent text last):',
+                    beforeContext,
+                    '',
+                    'Context after cursor (if any, to avoid contradictions):',
+                    afterContext || '[none]',
+                ].join('\n'),
+                systemPrompt: settings.systemPrompt || 'You are a writing continuation assistant. Continue prose seamlessly in the same voice.',
+                temperature: 0.7,
+            });
+
+            let continuation = String(resultText || '').trim();
+            continuation = continuation.replace(/^["“”']+/, '').replace(/["“”']+$/, '').trim();
+            if (!continuation) throw new Error('AI returned an empty continuation.');
+
+            const prevChar = textBeforeCursor.slice(-1);
+            if (prevChar && !/\s/.test(prevChar) && !/^[,.;:!?)]/.test(continuation)) {
+                continuation = ` ${continuation}`;
+            }
+
+            editor.chain().focus().insertContentAt(from, continuation).run();
+        } catch (error) {
+            console.error('Quick AI continue failed:', error);
+            alert('AI Continue Failed: ' + (error.message || error));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleEditorKeyDown = (event) => {
+        if (!editor) return;
+        if (!settings?.quickAiContinueEnabled) return;
+        if (expandDialog.isOpen) return;
+        if (event.defaultPrevented) return;
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (event.key !== '`') return;
+
+        event.preventDefault();
+        handleQuickAiContinue();
+    };
+
+    const commitDocumentTitle = () => {
+        if (!activeDocument) return;
+        const nextName = documentTitleDraft.trim();
+        if (!nextName) {
+            setDocumentTitleDraft(activeDocument.name || '');
+            return;
+        }
+        if (nextName !== activeDocument.name) {
+            updateDocumentName(activeDocument.id, nextName);
+        }
+    };
+
     if (!activeDocument) {
         // Calculate available documents for the current project
         const projectFolders = folders.filter(f => f.projectId === activeProjectId);
@@ -207,9 +310,9 @@ export default function EditorArea({ documentId, isSecondary }) {
 
         return (
             <main className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-                <div className="w-full max-w-md bg-[#001730] border border-seahawks-gray/10 rounded-xl overflow-hidden shadow-2xl">
-                    <div className="px-6 py-4 border-b border-[#001024] bg-[#001024]/50">
-                        <h3 className="text-lg font-semibold text-white">Select a Document</h3>
+                <div className="w-full max-w-md vw-surface-2 border border-seahawks-gray/10 rounded-xl overflow-hidden shadow-2xl">
+                    <div className="px-6 py-4 border-b vw-border bg-seahawks-navy/40">
+                        <h3 className="text-lg font-semibold vw-text-primary">Select a Document</h3>
                         <p className="text-sm text-seahawks-gray">Choose a document to open in this pane.</p>
                     </div>
                     <div className="max-h-80 overflow-y-auto p-2 custom-scrollbar">
@@ -224,7 +327,7 @@ export default function EditorArea({ documentId, isSecondary }) {
                                 >
                                     <FileText size={18} className="text-seahawks-gray group-hover:text-seahawks-green transition-colors" />
                                     <div className="flex-1 overflow-hidden">
-                                        <div className="text-sm font-medium text-white truncate">{doc.name}</div>
+                                        <div className="text-sm font-medium vw-text-primary truncate">{doc.name}</div>
                                         <div className="text-xs text-seahawks-gray mt-0.5">{(doc.wordCount || 0).toLocaleString()} words</div>
                                     </div>
                                 </button>
@@ -238,26 +341,34 @@ export default function EditorArea({ documentId, isSecondary }) {
 
     return (
         <div className="flex-1 flex flex-col relative w-full h-full">
-            <main className="flex-1 overflow-y-auto px-12 py-16 scrollbar-hide">
+            <main className="flex-1 overflow-y-auto px-12 py-16 scrollbar-hide bg-seahawks-navy">
                 <div className="max-w-3xl mx-auto">
                     {/* Document Title */}
-                    <h1
-                        className="text-4xl font-serif text-white mb-2 outline-none"
-                        contentEditable
-                        suppressContentEditableWarning
-                        onBlur={(e) => {
-                            // Update name in future. For now, it's read-only display of the file name
-                            // Actually, we can just display the activeDocument.name here instead of contentEditable
+                    <input
+                        value={documentTitleDraft}
+                        onChange={(e) => setDocumentTitleDraft(e.target.value)}
+                        onBlur={commitDocumentTitle}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                e.currentTarget.blur();
+                            }
+                            if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setDocumentTitleDraft(activeDocument.name || '');
+                                e.currentTarget.blur();
+                            }
                         }}
-                    >
-                        {activeDocument.name.replace(/_/g, ' ')}
-                    </h1>
+                        className="w-full text-4xl font-serif vw-text-primary mb-2 outline-none bg-transparent border border-transparent focus:border-seahawks-green/20 rounded px-1 -mx-1"
+                        placeholder="Untitled Document"
+                        aria-label="Document title"
+                    />
 
-                    <div className="text-seahawks-gray/70 text-sm mb-12 flex items-center gap-4">
+                    <div className="vw-text-soft text-sm mb-12 flex items-center gap-4">
                         <span>Auto-saving enabled</span>
                     </div>
 
-                    <div className="text-lg font-serif leading-relaxed text-seahawks-gray/90 pb-32 relative">
+                    <div className="text-lg font-serif leading-relaxed vw-text-muted pb-32 relative">
                         {editor && (
                             <BubbleMenu
                                 editor={editor}
@@ -270,7 +381,7 @@ export default function EditorArea({ documentId, isSecondary }) {
                                     if (state.selection.empty) return false;
                                     return state.doc.textBetween(from, to, ' ').trim().length > 0;
                                 }}
-                                className="flex items-center gap-1 p-1.5 rounded-lg border border-seahawks-green/30 bg-[#001024]/95 backdrop-blur-md shadow-2xl z-50 animate-in slide-in-from-bottom-2 fade-in"
+                                className="flex items-center gap-1 p-1.5 rounded-lg border border-seahawks-green/30 vw-surface-3 backdrop-blur-md shadow-2xl z-50 animate-in slide-in-from-bottom-2 fade-in"
                             >
                                 {isGenerating ? (
                                     <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-seahawks-green">
@@ -281,7 +392,7 @@ export default function EditorArea({ documentId, isSecondary }) {
                                     <>
                                         <button
                                             onClick={() => handleAiAction(text => `Rewrite this text to be punchier, more engaging, and professional:\n\n${text}`)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-seahawks-navy bg-seahawks-green rounded hover:bg-white transition-colors shadow-sm"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#001024] bg-seahawks-green rounded hover:bg-white transition-colors shadow-sm"
                                         >
                                             <Sparkles size={14} />
                                             AI Rewrite
@@ -311,13 +422,13 @@ export default function EditorArea({ documentId, isSecondary }) {
                                             </button>
 
                                             {/* Persona Dropdown (visible on hover) */}
-                                            <div className="absolute hidden group-hover/menu:flex flex-col bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-[#001730] border border-[#001024] rounded-md shadow-2xl overflow-hidden py-1">
-                                                <div className="text-[10px] font-bold text-seahawks-gray/50 uppercase px-3 py-1.5 bg-[#001024]/50 border-b border-[#001024] mb-1">Send to Persona</div>
+                                            <div className="absolute hidden group-hover/menu:flex flex-col bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 vw-surface-2 border vw-border rounded-md shadow-2xl overflow-hidden py-1">
+                                                <div className="text-[10px] font-bold text-seahawks-gray/50 uppercase px-3 py-1.5 bg-seahawks-navy/40 border-b vw-border mb-1">Send to Persona</div>
                                                 {personas && personas.map(p => (
                                                     <button
                                                         key={p.id}
                                                         onClick={() => handleAiAction(text => `Apply your specific skills to process and rewrite the following text according to your system instructions:\n\n${text}`, p.systemPrompt)}
-                                                        className="w-full text-left px-3 py-2 text-xs text-white hover:bg-seahawks-navy/80 hover:text-seahawks-green transition-colors border-b border-[#001024]/50 last:border-0"
+                                                        className="w-full text-left px-3 py-2 text-xs vw-text-primary hover:bg-seahawks-navy/80 hover:text-seahawks-green transition-colors border-b vw-border last:border-0"
                                                     >
                                                         <div className="font-semibold truncate">{p.title}</div>
                                                         <div className="text-[10px] text-seahawks-gray truncate mt-0.5">{p.description}</div>
@@ -329,13 +440,13 @@ export default function EditorArea({ documentId, isSecondary }) {
                                 )}
                             </BubbleMenu>
                         )}
-                        <EditorContent editor={editor} />
+                        <EditorContent editor={editor} onKeyDown={handleEditorKeyDown} />
                     </div>
                 </div>
             </main>
 
             {/* Bottom Advanced Formatting Toolbar */}
-            <footer className="h-14 border-t border-[#001024] flex items-center justify-between px-6 bg-[#001730]/95 backdrop-blur-md absolute bottom-0 left-0 right-0 z-10 w-full overflow-x-auto scrollbar-hide">
+            <footer className="h-14 border-t vw-border flex items-center justify-between px-6 vw-surface-2 backdrop-blur-md absolute bottom-0 left-0 right-0 z-10 w-full overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-1 min-w-max">
 
                     {/* Font & Size (Visual Only for now) */}
@@ -619,6 +730,52 @@ function buildExpandedDocumentName(baseName, documents) {
         i += 1;
     }
     return `${stem}_${i}`;
+}
+
+function jumpToFindOccurrenceInEditor(editor, request) {
+    const query = request?.query || '';
+    const occurrenceIndex = request?.occurrenceIndex ?? 0;
+    const matchCase = Boolean(request?.matchCase);
+    if (!query) return false;
+
+    const needle = matchCase ? query : query.toLowerCase();
+    let globalOccurrence = 0;
+    let range = null;
+
+    editor.state.doc.descendants((node, pos) => {
+        if (range) return false;
+        if (!node.isText || !node.text) return true;
+
+        const text = node.text;
+        const haystack = matchCase ? text : text.toLowerCase();
+        let searchFrom = 0;
+
+        while (searchFrom <= haystack.length - needle.length) {
+            const found = haystack.indexOf(needle, searchFrom);
+            if (found === -1) break;
+
+            if (globalOccurrence === occurrenceIndex) {
+                range = { from: pos + found, to: pos + found + query.length };
+                return false;
+            }
+
+            globalOccurrence += 1;
+            searchFrom = found + Math.max(needle.length, 1);
+        }
+
+        return true;
+    });
+
+    if (!range) return false;
+
+    editor
+        .chain()
+        .focus()
+        .setTextSelection(range)
+        .scrollIntoView()
+        .run();
+
+    return true;
 }
 
 // Reusable Toolbar Button

@@ -34,12 +34,12 @@ export default function Sidebar({ isOpen, onClose }) {
     return (
         <aside
             className={clsx(
-                "bg-[#001730] border-l border-[#001024] flex flex-col transition-all duration-300 ease-in-out z-20",
+                "vw-surface-2 border-l vw-border flex flex-col transition-all duration-300 ease-in-out z-20",
                 isOpen ? "w-80 opacity-100" : "w-0 opacity-0 overflow-hidden border-none"
             )}
         >
-            <div className="h-14 border-b border-[#001024] flex items-center justify-between px-4 shrink-0 bg-seahawks-navy/20">
-                <div className="flex items-center gap-2 font-medium text-white">
+            <div className="h-14 border-b vw-border flex items-center justify-between px-4 shrink-0 bg-seahawks-navy/20">
+                <div className="flex items-center gap-2 font-medium vw-text-primary">
                     <SidebarIcon size={18} className="text-seahawks-gray" />
                     <span>Binder</span>
                 </div>
@@ -71,20 +71,20 @@ export default function Sidebar({ isOpen, onClose }) {
 
                     return (
                         <div key={folder.id} className="mb-2">
-                            <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-seahawks-gray hover:bg-seahawks-navy/50 rounded-md group cursor-pointer text-white">
+                            <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-seahawks-gray hover:bg-seahawks-navy/50 rounded-md group cursor-pointer vw-text-primary">
                                 <FolderOpen size={16} className="text-seahawks-green" />
                                 <span className="flex-1 truncate">{folder.name}</span>
                                 <span className="text-xs text-seahawks-gray/50 font-mono">{folderWordCount.toLocaleString()}</span>
                                 <button
                                     onClick={(e) => handleAddDocument(folder.id, e)}
                                     title="New Document"
-                                    className="opacity-0 group-hover:opacity-100 p-1 text-seahawks-green hover:text-white transition-all rounded hover:bg-[#001024]"
+                                    className="opacity-0 group-hover:opacity-100 p-1 text-seahawks-green hover:text-white transition-all rounded hover:bg-seahawks-navy/30"
                                 >
                                     <FilePlus size={14} />
                                 </button>
                             </div>
 
-                            <div className="ml-4 mt-1 space-y-0.5 border-l border-[#002244] pl-2">
+                            <div className="ml-4 mt-1 space-y-0.5 border-l vw-border-soft pl-2">
                                 {folderDocs.map(doc => {
                                     const isPrimary = doc.id === activeDocumentId;
                                     const isSecondary = doc.id === activeDocumentIdSecondary;
@@ -95,7 +95,7 @@ export default function Sidebar({ isOpen, onClose }) {
                                             onClick={() => setActiveDocument(doc.id)}
                                             className={clsx(
                                                 "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer group",
-                                                isActive ? "bg-seahawks-navy/80 text-white border border-[#001024]" : "text-seahawks-gray hover:bg-seahawks-navy/50 border border-transparent"
+                                                isActive ? "bg-seahawks-navy/80 vw-text-primary border vw-border" : "text-seahawks-gray hover:bg-seahawks-navy/50 border border-transparent"
                                             )}
                                         >
                                             <FileText size={14} className={isActive ? "text-seahawks-green" : "opacity-60 group-hover:opacity-100 transition-opacity"} />

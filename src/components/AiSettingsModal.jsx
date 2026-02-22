@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import useStore from '../store/useStore';
-import { X, Settings2, KeyRound, Bot, Sparkles, UserCircle2, Plus, Trash2 } from 'lucide-react';
+import { X, Settings2, KeyRound, Bot, Sparkles, UserCircle2, Plus, Trash2, Palette, SunMedium, Moon, Keyboard, Monitor } from 'lucide-react';
 import clsx from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,6 +14,8 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
 
     const [openRouterKey, setOpenRouterKey] = useState(settings.openRouterApiKey || '');
     const [openAiKey, setOpenAiKey] = useState(settings.openAiApiKey || '');
+    const [themeMode, setThemeMode] = useState(settings.themeMode || 'dark');
+    const [quickAiContinueEnabled, setQuickAiContinueEnabled] = useState(Boolean(settings.quickAiContinueEnabled));
     const [activeTab, setActiveTab] = useState(defaultTab); // 'persona' or 'api'
 
     // Default to the first persona in the list
@@ -36,9 +38,11 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
         if (isOpen) {
             setOpenRouterKey(settings.openRouterApiKey || '');
             setOpenAiKey(settings.openAiApiKey || '');
+            setThemeMode(settings.themeMode || 'dark');
+            setQuickAiContinueEnabled(Boolean(settings.quickAiContinueEnabled));
             setActiveTab(defaultTab);
         }
-    }, [isOpen, settings.openRouterApiKey, settings.openAiApiKey, defaultTab]);
+    }, [isOpen, settings.openRouterApiKey, settings.openAiApiKey, settings.themeMode, settings.quickAiContinueEnabled, defaultTab]);
 
     if (!isOpen) return null;
 
@@ -46,6 +50,8 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
         updateSettings({
             openRouterApiKey: openRouterKey.trim(),
             openAiApiKey: openAiKey.trim(),
+            themeMode: themeMode === 'light' ? 'light' : 'dark',
+            quickAiContinueEnabled: Boolean(quickAiContinueEnabled),
         });
         // Persona changes are saved immediately via onBlur/onChange logic below, 
         // but API keys we save on explicit close/save
@@ -69,14 +75,21 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
         }
     };
 
+    const handleThemeModeChange = (mode) => {
+        const nextMode = mode === 'light' ? 'light' : mode === 'system' ? 'system' : 'dark';
+        setThemeMode(nextMode);
+        // Apply immediately so the user gets instant visual feedback.
+        updateSettings({ themeMode: nextMode });
+    };
+
     // The handleSave was replaced by handleSaveAPI above
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#001024]/80 backdrop-blur-md p-4">
-            <div className="bg-seahawks-navy border border-[#001024] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center vw-overlay backdrop-blur-md p-4">
+            <div className="vw-surface border vw-border rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
 
-                <div className="px-6 py-4 border-b border-[#001024] bg-seahawks-navy/50 flex justify-between items-center shrink-0">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <div className="px-6 py-4 border-b vw-border bg-seahawks-navy/50 flex justify-between items-center shrink-0">
+                    <h2 className="text-xl font-bold vw-text-primary flex items-center gap-2">
                         {isApiOnly ? <Settings2 size={20} className="text-seahawks-green" /> : <Sparkles size={20} className="text-seahawks-green" />}
                         {isApiOnly ? 'AI Connection Settings' : 'AI Assistant Configuration'}
                     </h2>
@@ -89,13 +102,13 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
 
                     {/* Left Side: Tabs */}
                     {(showPersonaTab && showApiTab) ? (
-                        <div className="w-full md:w-48 border-b md:border-b-0 md:border-r border-[#001024] bg-[#001730] flex md:flex-col shrink-0">
+                        <div className="w-full md:w-48 border-b md:border-b-0 md:border-r vw-border vw-surface-2 flex md:flex-col shrink-0">
                             <button
                                 onClick={() => setActiveTab('persona')}
                                 className={clsx(
                                     "flex-1 md:flex-none flex items-center gap-3 px-4 py-4 md:py-3 text-sm font-medium transition-colors border-l-2",
                                     activeTab === 'persona'
-                                        ? "bg-seahawks-navy/50 text-white border-seahawks-green"
+                                        ? "bg-seahawks-navy/50 text-seahawks-gray border-seahawks-green"
                                         : "text-seahawks-gray hover:bg-seahawks-navy/30 border-transparent hover:text-white"
                                 )}
                             >
@@ -107,7 +120,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                 className={clsx(
                                     "flex-1 md:flex-none flex items-center gap-3 px-4 py-4 md:py-3 text-sm font-medium transition-colors border-l-2",
                                     activeTab === 'api'
-                                        ? "bg-seahawks-navy/50 text-white border-seahawks-green"
+                                        ? "bg-seahawks-navy/50 text-seahawks-gray border-seahawks-green"
                                         : "text-seahawks-gray hover:bg-seahawks-navy/30 border-transparent hover:text-white"
                                 )}
                             >
@@ -116,8 +129,8 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                             </button>
                         </div>
                     ) : (
-                        <div className="w-full md:w-48 border-b md:border-b-0 md:border-r border-[#001024] bg-[#001730] flex md:flex-col shrink-0">
-                            <div className="px-4 py-4 md:py-3 text-sm font-medium text-white flex items-center gap-3 border-l-2 border-seahawks-green bg-seahawks-navy/40">
+                        <div className="w-full md:w-48 border-b md:border-b-0 md:border-r vw-border vw-surface-2 flex md:flex-col shrink-0">
+                            <div className="px-4 py-4 md:py-3 text-sm font-medium text-seahawks-gray flex items-center gap-3 border-l-2 border-seahawks-green bg-seahawks-navy/40">
                                 {isApiOnly ? <Settings2 size={16} className="text-seahawks-green" /> : <UserCircle2 size={16} className="text-seahawks-green" />}
                                 {isApiOnly ? 'API Connections' : 'Skills & Persona'}
                             </div>
@@ -132,7 +145,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
 
                                 <div className="mb-6 flex justify-between items-start">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                                        <h3 className="text-lg font-semibold vw-text-primary mb-2 flex items-center gap-2">
                                             <Bot size={18} className="text-seahawks-green" />
                                             Skills / Persona Library
                                         </h3>
@@ -152,7 +165,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                 <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
 
                                     {/* Left half: List of Personas */}
-                                    <div className="w-full md:w-1/3 flex flex-col gap-2 overflow-y-auto pr-2 border-r border-[#001024]/50 custom-scrollbar">
+                                    <div className="w-full md:w-1/3 flex flex-col gap-2 overflow-y-auto pr-2 border-r vw-border custom-scrollbar">
                                         {personas.map(p => (
                                             <button
                                                 key={p.id}
@@ -160,13 +173,13 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                                 className={clsx(
                                                     "text-left p-3 rounded-lg border transition-all relative group",
                                                     selectedPersonaId === p.id
-                                                        ? "bg-[#001730] border-seahawks-green shadow-inner"
-                                                        : "border-seahawks-gray/10 hover:border-seahawks-gray/30 hover:bg-[#001730]/50"
+                                                        ? "vw-surface-2 border-seahawks-green shadow-inner"
+                                                        : "border-seahawks-gray/10 hover:border-seahawks-gray/30 hover:bg-seahawks-navy/20"
                                                 )}
                                             >
                                                 <div className={clsx(
                                                     "font-semibold text-sm mb-1 truncate",
-                                                    selectedPersonaId === p.id ? "text-seahawks-green" : "text-white"
+                                                        selectedPersonaId === p.id ? "text-seahawks-green" : "vw-text-primary"
                                                 )}>
                                                     {p.title || 'Untitled'}
                                                 </div>
@@ -177,7 +190,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                                 {/* Delete Button overlaid on hover */}
                                                 <div
                                                     className={clsx(
-                                                        "absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-[#001024]/80 text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 transition-colors opacity-0 group-hover:opacity-100",
+                                                        "absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md vw-surface-3 text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 transition-colors opacity-0 group-hover:opacity-100",
                                                         personas.length <= 1 && "hidden" // Don't allow delete if it's the last one
                                                     )}
                                                     onClick={(e) => {
@@ -207,7 +220,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                                     <input
                                                         value={editForm.title}
                                                         onChange={(e) => handleUpdateField('title', e.target.value)}
-                                                        className="w-full bg-[#001024] border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm text-white focus:outline-none focus:border-seahawks-green transition-colors"
+                                                        className="w-full vw-surface-3 border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm vw-text-primary focus:outline-none focus:border-seahawks-green transition-colors"
                                                         placeholder="e.g. Strict Editor"
                                                     />
                                                 </div>
@@ -216,7 +229,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                                     <input
                                                         value={editForm.description}
                                                         onChange={(e) => handleUpdateField('description', e.target.value)}
-                                                        className="w-full bg-[#001024] border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm text-white focus:outline-none focus:border-seahawks-green transition-colors"
+                                                        className="w-full vw-surface-3 border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm vw-text-primary focus:outline-none focus:border-seahawks-green transition-colors"
                                                         placeholder="Brief summary of this skill..."
                                                     />
                                                 </div>
@@ -225,7 +238,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                                     <textarea
                                                         value={editForm.systemPrompt}
                                                         onChange={(e) => handleUpdateField('systemPrompt', e.target.value)}
-                                                        className="w-full flex-1 bg-[#001024] border border-seahawks-gray/20 rounded-md py-3 px-4 text-sm text-white focus:outline-none focus:border-seahawks-green transition-colors shadow-inner font-sans resize-none placeholder:text-seahawks-gray/30"
+                                                        className="w-full flex-1 vw-surface-3 border border-seahawks-gray/20 rounded-md py-3 px-4 text-sm vw-text-primary focus:outline-none focus:border-seahawks-green transition-colors shadow-inner font-sans resize-none placeholder:text-seahawks-gray/30"
                                                         placeholder="You are an expert... Tell the AI exactly how to behave."
                                                     />
                                                 </div>
@@ -240,7 +253,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                         {showApiTab && activeTab === 'api' && (
                             <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
-                                    <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                                    <h3 className="text-lg font-semibold vw-text-primary mb-2 flex items-center gap-2">
                                         <KeyRound size={18} className="text-seahawks-green" />
                                         API Connections
                                     </h3>
@@ -249,8 +262,8 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                     </p>
                                 </div>
 
-                                <div className="flex flex-col gap-2 p-4 bg-[#001730] rounded-lg border border-seahawks-gray/10">
-                                    <label className="text-sm font-semibold text-white">
+                                <div className="flex flex-col gap-2 p-4 vw-surface-2 rounded-lg border border-seahawks-gray/10">
+                                    <label className="text-sm font-semibold vw-text-primary">
                                         OpenRouter API Key
                                     </label>
                                     <p className="text-xs text-seahawks-gray mb-2">
@@ -260,14 +273,14 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                         type="password"
                                         value={openRouterKey}
                                         onChange={(e) => setOpenRouterKey(e.target.value)}
-                                        className="w-full bg-[#001024] border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm text-white focus:outline-none focus:border-seahawks-green transition-colors shadow-inner font-mono placeholder:text-seahawks-gray/30"
+                                        className="w-full vw-surface-3 border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm vw-text-primary focus:outline-none focus:border-seahawks-green transition-colors shadow-inner font-mono placeholder:text-seahawks-gray/30"
                                         placeholder="sk-or-v1-..."
                                     />
                                 </div>
 
-                                <div className="flex flex-col gap-2 p-4 bg-[#001730] rounded-lg border border-seahawks-green/20 relative overflow-hidden">
+                                <div className="flex flex-col gap-2 p-4 vw-surface-2 rounded-lg border border-seahawks-green/20 relative overflow-hidden">
                                     <div className="absolute right-0 top-0 w-16 h-16 bg-seahawks-green/10 rounded-full blur-xl -mr-4 -mt-4" />
-                                    <label className="text-sm font-semibold text-white flex items-center justify-between">
+                                    <label className="text-sm font-semibold vw-text-primary flex items-center justify-between">
                                         <span>Local CLI (Codex / OpenAI)</span>
                                         {settings.openAiCliEnabled ? (
                                             <span className="text-xs bg-seahawks-green/20 text-seahawks-green px-2 py-0.5 rounded border border-seahawks-green/30">Enabled</span>
@@ -278,16 +291,100 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                                     <p className="text-xs text-seahawks-gray mb-1">
                                         Vibe Writer uses a local CLI in the background (prefers logged-in `codex` OAuth/session, falls back to Python `openai` CLI) and does not require a browser-stored key for Codex CLI mode.
                                     </p>
-                                    <label className="text-sm mt-1 text-white font-medium">OpenAI API Key (Optional / legacy fallback)</label>
+                                    <label className="text-sm mt-1 vw-text-primary font-medium">OpenAI API Key (Optional / legacy fallback)</label>
                                     <input
                                         type="password"
                                         value={openAiKey}
                                         onChange={(e) => setOpenAiKey(e.target.value)}
-                                        className="w-full bg-[#001024] border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm text-white focus:outline-none focus:border-seahawks-green transition-colors shadow-inner font-mono placeholder:text-seahawks-gray/30"
+                                        className="w-full vw-surface-3 border border-seahawks-gray/20 rounded-md py-2 px-3 text-sm vw-text-primary focus:outline-none focus:border-seahawks-green transition-colors shadow-inner font-mono placeholder:text-seahawks-gray/30"
                                         placeholder="Not required for CLI mode"
                                     />
                                     <div className="text-xs font-mono text-seahawks-green/70">
                                         Status: {settings.openAiCliEnabled ? "Active: using local CLI bridge (Codex preferred)" : "Disabled"}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3 p-4 vw-surface-2 rounded-lg border border-seahawks-gray/10">
+                                    <div className="flex items-center gap-2">
+                                        <Palette size={16} className="text-seahawks-green" />
+                                        <label className="text-sm font-semibold vw-text-primary">
+                                            Appearance
+                                        </label>
+                                    </div>
+                                    <p className="text-xs text-seahawks-gray">
+                                        Dark mode is the current production theme. Additional theme modes are temporarily disabled while contrast and UI consistency are being finalized.
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className={clsx(
+                                                'flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                                                'border-seahawks-gray/20 text-seahawks-gray/60 cursor-not-allowed opacity-70'
+                                            )}
+                                        >
+                                            <Monitor size={15} />
+                                            System (Coming Soon)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleThemeModeChange('dark')}
+                                            className={clsx(
+                                                'flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                                                themeMode === 'dark'
+                                                    ? 'border-seahawks-green/40 bg-seahawks-green/10 text-seahawks-green'
+                                                    : 'border-seahawks-gray/20 text-seahawks-gray hover:text-white hover:bg-seahawks-navy/30'
+                                            )}
+                                        >
+                                            <Moon size={15} />
+                                            Dark Mode
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className={clsx(
+                                                'flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                                                'border-seahawks-gray/20 text-seahawks-gray/60 cursor-not-allowed opacity-70'
+                                            )}
+                                        >
+                                            <SunMedium size={15} />
+                                            Light (Coming Soon)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3 p-4 vw-surface-2 rounded-lg border border-seahawks-gray/10">
+                                    <div className="flex items-center gap-2">
+                                        <Keyboard size={16} className="text-seahawks-green" />
+                                        <label className="text-sm font-semibold vw-text-primary">
+                                            Quick AI Continue
+                                        </label>
+                                    </div>
+                                    <p className="text-xs text-seahawks-gray">
+                                        When enabled, pressing <span className="font-mono text-white">`</span> inside the editor asks AI to continue from your cursor and inserts the next two sentences.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setQuickAiContinueEnabled(prev => !prev)}
+                                        className={clsx(
+                                            'flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors',
+                                            quickAiContinueEnabled
+                                                ? 'border-seahawks-green/40 bg-seahawks-green/10 text-seahawks-green'
+                                                : 'border-seahawks-gray/20 text-seahawks-gray hover:text-white hover:bg-seahawks-navy/30'
+                                        )}
+                                    >
+                                        <span>{quickAiContinueEnabled ? 'Enabled' : 'Disabled'}</span>
+                                        <span className={clsx(
+                                            'text-[11px] px-2 py-0.5 rounded border',
+                                            quickAiContinueEnabled
+                                                ? 'border-seahawks-green/30 bg-seahawks-green/15'
+                                                : 'border-seahawks-gray/20'
+                                        )}>
+                                            Shortcut: `
+                                        </span>
+                                    </button>
+                                    <div className="text-[11px] text-seahawks-gray/80">
+                                        Tip: Leave this off if you regularly type backticks in your document.
                                     </div>
                                 </div>
                             </div>
@@ -296,7 +393,7 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                     </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-[#001024] bg-seahawks-navy/50 flex justify-end shrink-0">
+                <div className="px-6 py-4 border-t vw-border bg-seahawks-navy/50 flex justify-end shrink-0">
                     <button
                         onClick={handleSaveAPI}
                         className="px-6 py-2 rounded-md font-bold text-sm transition-all text-[#001024] bg-seahawks-green hover:bg-white shadow-sm"

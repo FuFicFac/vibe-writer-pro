@@ -13,18 +13,25 @@ export default function StartupCheckModal() {
     const [detectedTools, setDetectedTools] = useState({ codex: { present: false }, claude: { present: false } });
     const [openRouterKey, setOpenRouterKey] = useState(settings.openRouterApiKey || '');
 
-    // Run startup checks on mount if necessary dependencies are missing
+    // Run startup checks on mount:
+    // - If CLI mode is enabled, verify runtime CLI health and auto-open on failure.
+    // - If nothing is configured yet, open onboarding and run checks.
     useEffect(() => {
         const hasOpenRouter = !!settings.openRouterApiKey;
         const hasCliEnabled = settings.openAiCliEnabled;
 
-        if (!hasOpenRouter && !hasCliEnabled) {
+        if (hasCliEnabled) {
+            checkCli({ autoOpenOnFailure: true });
+            return;
+        }
+
+        if (!hasOpenRouter) {
             setIsOpen(true);
             checkCli();
         }
     }, [settings.openRouterApiKey, settings.openAiCliEnabled]);
 
-    const checkCli = async () => {
+    const checkCli = async ({ autoOpenOnFailure = false } = {}) => {
         setCliStatus('checking');
         try {
             const res = await fetch('/api/openai-cli/check');
@@ -37,6 +44,7 @@ export default function StartupCheckModal() {
                 if (data.authenticated === false) {
                     setCliStatus('auth-missing');
                     setCliAuthMessage(data.authError || 'OpenAI OAuth/session CLI is installed but not authenticated.');
+                    if (autoOpenOnFailure) setIsOpen(true);
                 } else {
                     setCliStatus('found');
                     setCliAuthMessage('');
@@ -46,12 +54,14 @@ export default function StartupCheckModal() {
                 setCliProvider('');
                 setDetectedTools(data.detectedTools || { codex: { present: false }, claude: { present: false } });
                 setCliAuthMessage('');
+                if (autoOpenOnFailure) setIsOpen(true);
             }
         } catch (err) {
             console.error('Failed to check CLI API bridge - this requires the Vite dev server custom middleware.', err);
             setCliStatus('error');
             setCliProvider('');
             setCliAuthMessage('');
+            if (autoOpenOnFailure) setIsOpen(true);
         }
     };
 
@@ -121,7 +131,7 @@ export default function StartupCheckModal() {
                                             </div>
                                             <button
                                                 onClick={handleEnableCli}
-                                                className="text-xs bg-white text-seahawks-navy font-bold px-4 py-1.5 rounded-md hover:bg-seahawks-gray transition-colors shadow-sm"
+                                                className="text-xs bg-white text-[#001024] font-bold px-4 py-1.5 rounded-md hover:bg-seahawks-gray transition-colors shadow-sm"
                                             >
                                                 Use local CLI
                                             </button>
@@ -135,7 +145,7 @@ export default function StartupCheckModal() {
                                             </div>
                                             <button
                                                 onClick={handleEnableCli}
-                                                className="text-xs bg-white text-seahawks-navy font-bold px-4 py-1.5 rounded-md hover:bg-seahawks-gray transition-colors shadow-sm"
+                                                className="text-xs bg-white text-[#001024] font-bold px-4 py-1.5 rounded-md hover:bg-seahawks-gray transition-colors shadow-sm"
                                             >
                                                 Use local CLI
                                             </button>
@@ -241,7 +251,7 @@ export default function StartupCheckModal() {
                                             className={clsx(
                                                 "text-xs font-bold px-4 py-2 rounded-md transition-all shadow-sm",
                                                 openRouterKey.trim().length > 10
-                                                    ? "bg-seahawks-green text-seahawks-navy hover:bg-white hover:text-seahawks-navy"
+                                                    ? "bg-seahawks-green text-[#001024] hover:bg-white hover:text-[#001024]"
                                                     : "bg-seahawks-gray/10 text-seahawks-gray cursor-not-allowed"
                                             )}
                                         >

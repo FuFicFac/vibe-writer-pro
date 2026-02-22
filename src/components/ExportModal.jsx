@@ -3,8 +3,9 @@ import useStore from '../store/useStore';
 import { X, FileText, Download, CheckSquare, Square } from 'lucide-react';
 import clsx from 'clsx';
 import TurndownService from 'turndown';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, UnderlineType } from 'docx';
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 
 export default function ExportModal({ isOpen, onClose }) {
     const { activeProjectId, projects, folders, documents } = useStore();
@@ -12,6 +13,7 @@ export default function ExportModal({ isOpen, onClose }) {
     // State for which docs are selected
     const [selectedDocIds, setSelectedDocIds] = useState(new Set(documents.filter(d => d.includeInContext).map(d => d.id)));
     const [exportFormat, setExportFormat] = useState('md'); // 'md' or 'docx'
+    const [exportMode, setExportMode] = useState('master'); // 'master' or 'individual-zip'
     const [isExporting, setIsExporting] = useState(false);
 
     if (!isOpen) return null;
@@ -56,74 +58,37 @@ export default function ExportModal({ isOpen, onClose }) {
                 });
             });
 
-            const isMaster = exportDocs.length > 1;
-            const fileNameStr = isMaster ? `${activeProject.name}_Master` : exportDocs[0].name;
+            if (exportMode === 'master') {
+                const isMaster = exportDocs.length > 1;
+                const fileNameStr = isMaster ? `${activeProject.name}_Master` : exportDocs[0].name;
 
-            if (exportFormat === 'md') {
-                const turndownService = new TurndownService({ headingStyle: 'atx' });
-                let combinedMarkdown = '';
+                if (exportFormat === 'md') {
+                    const combinedMarkdown = buildMasterMarkdown(exportDocs);
+                    const blob = new Blob([combinedMarkdown], { type: 'text/markdown;charset=utf-8' });
+                    saveAs(blob, `${sanitizeFileName(fileNameStr)}.md`);
+                } else if (exportFormat === 'docx') {
+                    const blob = await buildMasterDocxBlob(exportDocs);
+                    saveAs(blob, `${sanitizeFileName(fileNameStr)}.docx`);
+                }
+            } else if (exportMode === 'individual-zip') {
+                const zip = new JSZip();
+                const folderName = sanitizeFileName(activeProject.name || 'Project_Export');
+                const root = zip.folder(folderName) || zip;
 
-                exportDocs.forEach((doc, idx) => {
-                    if (isMaster) combinedMarkdown += `# ${doc.name.replace(/_/g, ' ')}\n\n`;
-                    combinedMarkdown += turndownService.turndown(doc.content) + '\n\n';
-                    if (idx < exportDocs.length - 1 && isMaster) combinedMarkdown += '---\n\n';
-                });
-
-                const blob = new Blob([combinedMarkdown], { type: 'text/markdown;charset=utf-8' });
-                saveAs(blob, `${fileNameStr}.md`);
-
-            } else if (exportFormat === 'docx') {
-
-                // Very basic HTML to DOCX parser for now
-                const docxSections = [];
-
-                exportDocs.forEach((doc, idx) => {
-                    if (isMaster) {
-                        docxSections.push(new Paragraph({
-                            text: doc.name.replace(/_/g, ' '),
-                            heading: HeadingLevel.HEADING_1,
-                            spacing: { after: 300 }
-                        }));
+                if (exportFormat === 'md') {
+                    for (const doc of exportDocs) {
+                        const markdown = buildSingleMarkdown(doc);
+                        root.file(`${sanitizeFileName(doc.name)}.md`, markdown);
                     }
-
-                    // Parse the HTML content simply (real implementation needs a more robust HTML parser like html-to-docx, 
-                    // but sticking to docx library basics for the moment)
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = doc.content;
-
-                    Array.from(tempDiv.childNodes).forEach(node => {
-                        if (node.nodeName === 'P' || node.nodeType === 3) {
-                            let text = node.textContent || "";
-                            if (text.trim()) {
-                                docxSections.push(new Paragraph({
-                                    children: [new TextRun(text)],
-                                    spacing: { after: 200 }
-                                }));
-                            }
-                        } else if (node.nodeName === 'H1') {
-                            docxSections.push(new Paragraph({ text: node.textContent, heading: HeadingLevel.HEADING_1, spacing: { after: 200, before: 200 } }));
-                        } else if (node.nodeName === 'H2') {
-                            docxSections.push(new Paragraph({ text: node.textContent, heading: HeadingLevel.HEADING_2, spacing: { after: 200, before: 200 } }));
-                        } else if (node.nodeName === 'H3') {
-                            docxSections.push(new Paragraph({ text: node.textContent, heading: HeadingLevel.HEADING_3, spacing: { after: 200, before: 200 } }));
-                        }
-                    });
-
-                    // Add page break if master document
-                    if (idx < exportDocs.length - 1 && isMaster) {
-                        docxSections.push(new Paragraph({ pageBreakBefore: true }));
+                } else if (exportFormat === 'docx') {
+                    for (const doc of exportDocs) {
+                        const blob = await buildSingleDocxBlob(doc);
+                        root.file(`${sanitizeFileName(doc.name)}.docx`, blob);
                     }
-                });
+                }
 
-                const docxData = new Document({
-                    sections: [{
-                        properties: {},
-                        children: docxSections
-                    }]
-                });
-
-                const blob = await Packer.toBlob(docxData);
-                saveAs(blob, `${fileNameStr}.docx`);
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                saveAs(zipBlob, `${folderName}_Individual_Documents.zip`);
             }
 
             onClose();
@@ -204,6 +169,52 @@ export default function ExportModal({ isOpen, onClose }) {
 
                     {/* Right Side: Options */}
                     <div className="w-full md:w-64 bg-seahawks-navy p-6 flex flex-col">
+                        <h3 className="text-sm font-semibold text-white mb-4">Export Type</h3>
+
+                        <div className="space-y-3 mb-6">
+                            <label className={clsx(
+                                "flex items-center gap-3 p-3 rounded-md cursor-pointer border transition-colors",
+                                exportMode === 'master' ? "bg-[#001730] border-seahawks-green/50" : "border-[#001024] hover:bg-[#001730]"
+                            )}>
+                                <input
+                                    type="radio"
+                                    name="mode"
+                                    value="master"
+                                    checked={exportMode === 'master'}
+                                    onChange={(e) => setExportMode(e.target.value)}
+                                    className="hidden"
+                                />
+                                <div className={clsx("w-4 h-4 rounded-full border flex items-center justify-center", exportMode === 'master' ? "border-seahawks-green" : "border-seahawks-gray")}>
+                                    {exportMode === 'master' && <div className="w-2 h-2 rounded-full bg-seahawks-green" />}
+                                </div>
+                                <div>
+                                    <div className="text-sm text-white font-medium">Master Document</div>
+                                    <div className="text-xs text-seahawks-gray">Combine checked docs into one export</div>
+                                </div>
+                            </label>
+
+                            <label className={clsx(
+                                "flex items-center gap-3 p-3 rounded-md cursor-pointer border transition-colors",
+                                exportMode === 'individual-zip' ? "bg-[#001730] border-seahawks-green/50" : "border-[#001024] hover:bg-[#001730]"
+                            )}>
+                                <input
+                                    type="radio"
+                                    name="mode"
+                                    value="individual-zip"
+                                    checked={exportMode === 'individual-zip'}
+                                    onChange={(e) => setExportMode(e.target.value)}
+                                    className="hidden"
+                                />
+                                <div className={clsx("w-4 h-4 rounded-full border flex items-center justify-center", exportMode === 'individual-zip' ? "border-seahawks-green" : "border-seahawks-gray")}>
+                                    {exportMode === 'individual-zip' && <div className="w-2 h-2 rounded-full bg-seahawks-green" />}
+                                </div>
+                                <div>
+                                    <div className="text-sm text-white font-medium">Individual Files (ZIP)</div>
+                                    <div className="text-xs text-seahawks-gray">One file per checked doc, packed in a zip</div>
+                                </div>
+                            </label>
+                        </div>
+
                         <h3 className="text-sm font-semibold text-white mb-4">Export Format</h3>
 
                         <div className="space-y-3 mb-8">
@@ -254,9 +265,11 @@ export default function ExportModal({ isOpen, onClose }) {
                             <div className="text-xs text-seahawks-gray mb-3 text-center">
                                 {selectedDocIds.size === 0
                                     ? "Select at least one document"
-                                    : selectedDocIds.size === 1
-                                        ? "Exporting 1 document"
-                                        : `Compiling Master Document (${selectedDocIds.size} docs)`}
+                                    : exportMode === 'individual-zip'
+                                        ? `Preparing ZIP (${selectedDocIds.size} file${selectedDocIds.size === 1 ? '' : 's'})`
+                                        : selectedDocIds.size === 1
+                                            ? "Exporting 1 document"
+                                            : `Compiling Master Document (${selectedDocIds.size} docs)`}
                             </div>
 
                             <button
@@ -273,4 +286,274 @@ export default function ExportModal({ isOpen, onClose }) {
             </div>
         </div>
     );
+}
+
+function buildSingleMarkdown(doc) {
+    const turndownService = new TurndownService({ headingStyle: 'atx' });
+    return turndownService.turndown(doc.content || '') + '\n';
+}
+
+function buildMasterMarkdown(exportDocs) {
+    const turndownService = new TurndownService({ headingStyle: 'atx' });
+    const isMaster = exportDocs.length > 1;
+    let combinedMarkdown = '';
+
+    exportDocs.forEach((doc, idx) => {
+        if (isMaster) combinedMarkdown += `# ${doc.name.replace(/_/g, ' ')}\n\n`;
+        combinedMarkdown += turndownService.turndown(doc.content || '') + '\n\n';
+        if (idx < exportDocs.length - 1 && isMaster) combinedMarkdown += '---\n\n';
+    });
+
+    return combinedMarkdown;
+}
+
+async function buildSingleDocxBlob(doc) {
+    const docxData = new Document({
+        sections: [{
+            properties: {},
+            children: buildDocxParagraphsForContent(doc.content || '', false, doc.name),
+        }]
+    });
+    return Packer.toBlob(docxData);
+}
+
+async function buildMasterDocxBlob(exportDocs) {
+    const docxSections = [];
+    const isMaster = exportDocs.length > 1;
+
+    exportDocs.forEach((doc, idx) => {
+        docxSections.push(...buildDocxParagraphsForContent(doc.content || '', isMaster, doc.name));
+
+        if (idx < exportDocs.length - 1 && isMaster) {
+            docxSections.push(new Paragraph({ pageBreakBefore: true }));
+        }
+    });
+
+    const docxData = new Document({
+        sections: [{
+            properties: {},
+            children: docxSections
+        }]
+    });
+
+    return Packer.toBlob(docxData);
+}
+
+function buildDocxParagraphsForContent(html, includeDocHeading, docName) {
+    const paragraphs = [];
+
+    if (includeDocHeading) {
+        paragraphs.push(new Paragraph({
+            text: (docName || '').replace(/_/g, ' '),
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 300 }
+        }));
+    }
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html || '';
+
+    Array.from(tempDiv.childNodes).forEach(node => {
+        paragraphs.push(...convertHtmlNodeToDocxParagraphs(node));
+    });
+
+    return paragraphs;
+}
+
+function convertHtmlNodeToDocxParagraphs(node, context = {}) {
+    if (!node) return [];
+
+    if (node.nodeType === Node.TEXT_NODE) {
+        const text = normalizeWhitespace(node.textContent || '');
+        if (!text.trim()) return [];
+        return [new Paragraph({
+            children: [new TextRun(text)],
+            spacing: { after: 200 }
+        })];
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return [];
+
+    const tag = node.nodeName.toUpperCase();
+
+    if (tag === 'P') {
+        return [buildDocxParagraphFromInline(node, { spacing: { after: 200 } })].filter(Boolean);
+    }
+
+    if (tag === 'H1' || tag === 'H2' || tag === 'H3') {
+        const headingLevel = tag === 'H1'
+            ? HeadingLevel.HEADING_1
+            : tag === 'H2'
+                ? HeadingLevel.HEADING_2
+                : HeadingLevel.HEADING_3;
+
+        const runs = buildTextRunsFromInline(node);
+        if (!runs.length) return [];
+
+        return [new Paragraph({
+            children: runs,
+            heading: headingLevel,
+            spacing: { after: 200, before: 200 }
+        })];
+    }
+
+    if (tag === 'UL' || tag === 'OL') {
+        return buildListParagraphs(node, {
+            ordered: tag === 'OL',
+            level: context.level || 0,
+        });
+    }
+
+    if (tag === 'BLOCKQUOTE') {
+        const childParagraphs = [];
+
+        Array.from(node.childNodes).forEach(child => {
+            childParagraphs.push(...convertHtmlNodeToDocxParagraphs(child, context));
+        });
+
+        if (childParagraphs.length > 0) {
+            return childParagraphs;
+        }
+
+        const quoteRuns = buildTextRunsFromInline(node, { italics: true });
+        if (!quoteRuns.length) return [];
+        return [new Paragraph({
+            children: quoteRuns,
+            spacing: { after: 200 },
+            indent: { left: 480 },
+        })];
+    }
+
+    if (tag === 'HR') {
+        return [new Paragraph({
+            children: [new TextRun({ text: '--------------------' })],
+            spacing: { before: 180, after: 180 },
+        })];
+    }
+
+    if (tag === 'PRE') {
+        const text = node.textContent || '';
+        if (!text.trim()) return [];
+        return [new Paragraph({
+            children: [new TextRun({ text, font: 'Courier New' })],
+            spacing: { after: 200 },
+        })];
+    }
+
+    // Fallback: recurse children to avoid dropping content from unknown wrappers.
+    const paragraphs = [];
+    Array.from(node.childNodes).forEach(child => {
+        paragraphs.push(...convertHtmlNodeToDocxParagraphs(child, context));
+    });
+    return paragraphs;
+}
+
+function buildListParagraphs(listNode, { ordered = false, level = 0 } = {}) {
+    const paragraphs = [];
+    const listItems = Array.from(listNode.children).filter(child => child.nodeName.toUpperCase() === 'LI');
+
+    listItems.forEach((li, idx) => {
+        const clone = li.cloneNode(true);
+        Array.from(clone.querySelectorAll('ul,ol')).forEach(nested => nested.remove());
+
+        const itemRuns = buildTextRunsFromInline(clone);
+        if (itemRuns.length) {
+            const prefix = ordered ? `${idx + 1}. ` : '• ';
+            paragraphs.push(new Paragraph({
+                children: [new TextRun(prefix), ...itemRuns],
+                spacing: { after: 120 },
+                indent: {
+                    left: 360 * (level + 1),
+                    hanging: 180,
+                },
+            }));
+        }
+
+        Array.from(li.children)
+            .filter(child => {
+                const tag = child.nodeName.toUpperCase();
+                return tag === 'UL' || tag === 'OL';
+            })
+            .forEach(nestedList => {
+                paragraphs.push(...buildListParagraphs(nestedList, {
+                    ordered: nestedList.nodeName.toUpperCase() === 'OL',
+                    level: level + 1,
+                }));
+            });
+    });
+
+    return paragraphs;
+}
+
+function buildDocxParagraphFromInline(element, options = {}) {
+    const runs = buildTextRunsFromInline(element);
+    if (!runs.length) return null;
+    return new Paragraph({
+        children: runs,
+        ...options,
+    });
+}
+
+function buildTextRunsFromInline(node, marks = {}) {
+    const runs = [];
+    let hasVisible = false;
+
+    const walk = (current, activeMarks) => {
+        if (!current) return;
+
+        if (current.nodeType === Node.TEXT_NODE) {
+            const text = normalizeWhitespace(current.textContent || '');
+            if (!text) return;
+            if (text.trim()) hasVisible = true;
+            runs.push(new TextRun({
+                text,
+                bold: Boolean(activeMarks.bold),
+                italics: Boolean(activeMarks.italics),
+                strike: Boolean(activeMarks.strike),
+                underline: activeMarks.underline ? { type: UnderlineType.SINGLE } : undefined,
+                font: activeMarks.code ? 'Courier New' : undefined,
+                color: activeMarks.link ? '1D4ED8' : undefined,
+            }));
+            return;
+        }
+
+        if (current.nodeType !== Node.ELEMENT_NODE) return;
+
+        const tag = current.nodeName.toUpperCase();
+
+        if (tag === 'BR') {
+            runs.push(new TextRun({ text: '', break: 1 }));
+            return;
+        }
+
+        const nextMarks = { ...activeMarks };
+        if (tag === 'STRONG' || tag === 'B') nextMarks.bold = true;
+        if (tag === 'EM' || tag === 'I') nextMarks.italics = true;
+        if (tag === 'U') nextMarks.underline = true;
+        if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') nextMarks.strike = true;
+        if (tag === 'CODE') nextMarks.code = true;
+        if (tag === 'A') {
+            nextMarks.link = true;
+            nextMarks.underline = true;
+        }
+
+        Array.from(current.childNodes).forEach(child => walk(child, nextMarks));
+    };
+
+    walk(node, marks);
+
+    if (!hasVisible) return [];
+    return runs;
+}
+
+function normalizeWhitespace(text) {
+    return String(text || '').replace(/\u00a0/g, ' ');
+}
+
+
+function sanitizeFileName(name) {
+    return String(name || 'document')
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim();
 }

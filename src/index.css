@@ -3,9 +3,205 @@
 @tailwind utilities;
 
 @layer base {
+  :root,
+  [data-theme="dark"] {
+    --seahawks-navy: 0 34 68;
+    --seahawks-green: 105 190 40;
+    --seahawks-gray: 167 176 183;
+    --vw-surface-1: 0 16 36;
+    --vw-surface-2: 0 23 48;
+    --vw-surface-3: 0 20 41;
+    --vw-surface-4: 0 12 28;
+    --vw-border: 0 16 36;
+    --vw-border-soft: 0 34 68;
+    --vw-text-primary: 255 255 255;
+    --vw-text-muted: 167 176 183;
+    --vw-text-soft: 135 150 161;
+    --vw-editor-placeholder: 82 90 107;
+    --vw-overlay: 0 16 36;
+    color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    /* Seahawks-inspired light UI: navy-tinted canvas, bright green accent, dark readable text */
+    --seahawks-navy: 232 241 248;
+    --seahawks-green: 76 149 30;
+    --seahawks-gray: 12 28 41;
+    --vw-surface-1: 255 255 255;
+    --vw-surface-2: 242 248 252;
+    --vw-surface-3: 229 239 247;
+    --vw-surface-4: 217 231 241;
+    --vw-border: 163 185 202;
+    --vw-border-soft: 188 208 223;
+    --vw-text-primary: 7 22 35;
+    --vw-text-muted: 18 38 54;
+    --vw-text-soft: 47 68 84;
+    --vw-editor-placeholder: 92 112 128;
+    --vw-overlay: 16 34 52;
+    color-scheme: light;
+  }
+
+  html {
+    @apply bg-seahawks-navy;
+  }
+}
+
+@layer base {
   body {
     @apply bg-seahawks-navy text-seahawks-gray antialiased selection:bg-seahawks-green/30;
   }
+}
+
+@layer components {
+  .vw-surface {
+    background-color: rgb(var(--vw-surface-1));
+  }
+
+  .vw-surface-2 {
+    background-color: rgb(var(--vw-surface-2));
+  }
+
+  .vw-surface-3 {
+    background-color: rgb(var(--vw-surface-3));
+  }
+
+  .vw-surface-4 {
+    background-color: rgb(var(--vw-surface-4));
+  }
+
+  .vw-border {
+    border-color: rgb(var(--vw-border));
+  }
+
+  .vw-border-soft {
+    border-color: rgb(var(--vw-border-soft));
+  }
+
+  .vw-text-primary {
+    color: rgb(var(--vw-text-primary));
+  }
+
+  .vw-overlay {
+    background-color: rgb(var(--vw-overlay) / 0.8);
+  }
+
+  .vw-text-muted {
+    color: rgb(var(--vw-text-muted));
+  }
+
+  .vw-text-soft {
+    color: rgb(var(--vw-text-soft));
+  }
+}
+
+@layer utilities {
+  [data-theme="light"] .prose-invert {
+    --tw-prose-body: rgb(25 41 56);
+    --tw-prose-headings: rgb(10 29 46);
+    --tw-prose-lead: rgb(43 63 78);
+    --tw-prose-links: rgb(20 71 112);
+    --tw-prose-bold: rgb(10 29 46);
+    --tw-prose-counters: rgb(73 94 111);
+    --tw-prose-bullets: rgb(125 148 167);
+    --tw-prose-hr: rgb(206 221 232);
+    --tw-prose-quotes: rgb(10 29 46);
+    --tw-prose-quote-borders: rgb(184 202 216);
+    --tw-prose-captions: rgb(73 94 111);
+    --tw-prose-code: rgb(10 29 46);
+    --tw-prose-pre-code: rgb(241 247 252);
+    --tw-prose-pre-bg: rgb(16 34 52);
+    --tw-prose-th-borders: rgb(184 202 216);
+    --tw-prose-td-borders: rgb(206 221 232);
+  }
+
+  .vw-editor-prose {
+    color: rgb(var(--vw-text-muted));
+  }
+
+  .vw-editor-prose :where(h1, h2, h3, h4, h5, h6) {
+    color: rgb(var(--vw-text-primary));
+  }
+
+  .vw-editor-prose :where(strong, b, code) {
+    color: rgb(var(--vw-text-primary));
+  }
+
+  .vw-editor-prose :where(a) {
+    color: rgb(var(--seahawks-green));
+  }
+
+  .vw-editor-prose :where(blockquote) {
+    color: rgb(var(--vw-text-muted));
+    border-left-color: rgb(var(--vw-border));
+  }
+
+  .vw-editor-prose :where(hr) {
+    border-color: rgb(var(--vw-border));
+  }
+
+  /* Improve contrast for legacy hardcoded dark-theme utility classes used across the app. */
+  [data-theme="light"] .text-white {
+    color: rgb(var(--vw-text-primary)) !important;
+  }
+
+  [data-theme="light"] .hover\:text-white:hover {
+    color: rgb(var(--vw-text-primary)) !important;
+  }
+
+  [data-theme="light"] .text-seahawks-gray\/90 {
+    color: rgb(var(--vw-text-muted)) !important;
+  }
+
+  [data-theme="light"] .text-seahawks-gray\/80,
+  [data-theme="light"] .text-seahawks-gray\/70 {
+    color: rgb(var(--vw-text-soft)) !important;
+  }
+
+  [data-theme="light"] .text-seahawks-gray\/60,
+  [data-theme="light"] .text-seahawks-gray\/50,
+  [data-theme="light"] .text-seahawks-gray\/30 {
+    color: rgb(var(--vw-text-soft) / 0.95) !important;
+  }
+
+  [data-theme="light"] .hover\:bg-seahawks-navy\/50:hover,
+  [data-theme="light"] .hover\:bg-seahawks-navy\/80:hover {
+    background-color: rgb(var(--vw-surface-3)) !important;
+  }
+
+  [data-theme="light"] .bg-seahawks-navy\/20 {
+    background-color: rgb(var(--vw-surface-2) / 0.9) !important;
+  }
+
+  /* Catch remaining hardcoded dark Tailwind arbitrary-color utilities used across legacy components. */
+  [data-theme="light"] [class*="bg-[#001730]"] {
+    background-color: rgb(var(--vw-surface-2)) !important;
+  }
+
+  [data-theme="light"] [class*="bg-[#001024]"] {
+    background-color: rgb(var(--vw-surface-3)) !important;
+  }
+
+  [data-theme="light"] [class*="bg-[#001429]"] {
+    background-color: rgb(var(--vw-surface-4)) !important;
+  }
+
+  [data-theme="light"] [class*="border-[#001024]"],
+  [data-theme="light"] [class*="border-[#001730]"] {
+    border-color: rgb(var(--vw-border)) !important;
+  }
+
+  [data-theme="light"] [class*="hover:bg-[#001730]"]:hover,
+  [data-theme="light"] [class*="hover:bg-[#001024]"]:hover {
+    background-color: rgb(var(--vw-surface-3)) !important;
+  }
+}
+
+[data-theme="light"] .ProseMirror {
+  color: rgb(var(--vw-text-muted));
+}
+
+[data-theme="light"] .ProseMirror :where(h1, h2, h3, h4, h5, h6) {
+  color: rgb(var(--vw-text-primary));
 }
 
 /* TipTap Editor Styles */
@@ -18,7 +214,7 @@
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {
-  color: #52525b;
+  color: rgb(var(--vw-editor-placeholder));
   content: attr(data-placeholder);
   float: left;
   height: 0;
