@@ -87,9 +87,9 @@ export default function StartupCheckModal() {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#001024]/80 backdrop-blur-md p-4">
-            <div className="bg-seahawks-navy border border-[#001024] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="bg-seahawks-navy border border-[#001024] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
 
-                <div className="px-6 py-5 border-b border-[#001024] bg-seahawks-navy/50 relative overflow-hidden">
+                <div className="px-6 py-5 border-b border-[#001024] bg-seahawks-navy/50 relative overflow-hidden shrink-0">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-seahawks-green/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <span className="text-seahawks-green font-black tracking-tighter uppercase text-2xl -rotate-3 select-none">Vibe</span>
@@ -98,7 +98,7 @@ export default function StartupCheckModal() {
                     <p className="text-sm text-seahawks-gray mt-1">Configure your AI providers before writing.</p>
                 </div>
 
-                <div className="p-6 flex flex-col gap-6">
+                <div className="p-6 flex flex-col gap-6 overflow-y-auto">
 
                     {/* OpenAI CLI Check Section */}
                     <div className="bg-[#001730] border border-seahawks-gray/10 rounded-lg p-4">
@@ -266,7 +266,7 @@ export default function StartupCheckModal() {
                 </div>
 
                 {/* Helper footer */}
-                <div className="px-6 py-4 bg-[#001024] flex justify-between items-center text-xs text-seahawks-gray border-t border-seahawks-gray/10">
+                <div className="px-6 py-4 bg-[#001024] flex justify-between items-center text-xs text-seahawks-gray border-t border-seahawks-gray/10 shrink-0">
                     <span>You can change these in Settings later.</span>
                     <span className="text-seahawks-gray/80">CLI OAuth (Codex) is preferred for local use.</span>
                 </div>
