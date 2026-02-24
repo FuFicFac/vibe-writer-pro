@@ -73,10 +73,10 @@ const useStore = create(
 
             settings: {
                 openRouterApiKey: '',
-                openRouterModel: 'google/gemini-2.5-pro',
+                openRouterModel: 'openrouter/auto',
                 openRouterThinkingEnabled: false,
                 openAiApiKey: '',
-                openAiModel: 'gpt-4o-mini',
+                openAiModel: 'gpt-4.1-mini',
                 openAiCliEnabled: false,
                 themeMode: 'dark', // 'dark' | 'light' | 'system'
                 quickAiContinueEnabled: false,

@@ -4,6 +4,16 @@ import { X, Settings2, KeyRound, Bot, Sparkles, UserCircle2, Plus, Trash2, Palet
 import clsx from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 
+const DEFAULT_OPENROUTER_MODEL = 'openrouter/auto';
+const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini';
+const PREFERRED_OPENROUTER_MODELS = ['openrouter/auto', 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4.5'];
+const PREFERRED_OPENAI_MODELS = ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'o4-mini', 'o3-mini'];
+
+function preferredRank(id, preferredIds) {
+    const idx = preferredIds.indexOf(id);
+    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+}
+
 export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
     const { settings, updateSettings, personas, createPersona, updatePersona, deletePersona } = useStore();
     const isPersonaOnly = mode === 'persona';
@@ -13,10 +23,10 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
     const defaultTab = isApiOnly ? 'api' : 'persona';
 
     const [openRouterKey, setOpenRouterKey] = useState(settings.openRouterApiKey || '');
-    const [openRouterModel, setOpenRouterModel] = useState(settings.openRouterModel || 'google/gemini-2.5-pro');
+    const [openRouterModel, setOpenRouterModel] = useState(settings.openRouterModel || DEFAULT_OPENROUTER_MODEL);
     const [openRouterThinkingEnabled, setOpenRouterThinkingEnabled] = useState(Boolean(settings.openRouterThinkingEnabled));
     const [openAiKey, setOpenAiKey] = useState(settings.openAiApiKey || '');
-    const [openAiModel, setOpenAiModel] = useState(settings.openAiModel || 'gpt-4o-mini');
+    const [openAiModel, setOpenAiModel] = useState(settings.openAiModel || DEFAULT_OPENAI_MODEL);
     const [themeMode, setThemeMode] = useState(settings.themeMode || 'dark');
     const [quickAiContinueEnabled, setQuickAiContinueEnabled] = useState(Boolean(settings.quickAiContinueEnabled));
     const [activeTab, setActiveTab] = useState(defaultTab); // 'persona' or 'api'
@@ -49,10 +59,10 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
     React.useEffect(() => {
         if (isOpen) {
             setOpenRouterKey(settings.openRouterApiKey || '');
-            setOpenRouterModel(settings.openRouterModel || 'google/gemini-2.5-pro');
+            setOpenRouterModel(settings.openRouterModel || DEFAULT_OPENROUTER_MODEL);
             setOpenRouterThinkingEnabled(Boolean(settings.openRouterThinkingEnabled));
             setOpenAiKey(settings.openAiApiKey || '');
-            setOpenAiModel(settings.openAiModel || 'gpt-4o-mini');
+            setOpenAiModel(settings.openAiModel || DEFAULT_OPENAI_MODEL);
             setThemeMode(settings.themeMode || 'dark');
             setQuickAiContinueEnabled(Boolean(settings.quickAiContinueEnabled));
             setActiveTab(defaultTab);
@@ -76,10 +86,10 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
     const handleSaveAPI = () => {
         updateSettings({
             openRouterApiKey: openRouterKey.trim(),
-            openRouterModel: openRouterModel || 'google/gemini-2.5-pro',
+            openRouterModel: openRouterModel || DEFAULT_OPENROUTER_MODEL,
             openRouterThinkingEnabled: Boolean(openRouterThinkingEnabled),
             openAiApiKey: openAiKey.trim(),
-            openAiModel: openAiModel || 'gpt-4o-mini',
+            openAiModel: openAiModel || DEFAULT_OPENAI_MODEL,
             themeMode: themeMode === 'light' ? 'light' : 'dark',
             quickAiContinueEnabled: Boolean(quickAiContinueEnabled),
         });
@@ -142,12 +152,16 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                         : false,
                     supportedParameters: Array.isArray(m.supported_parameters) ? m.supported_parameters : [],
                 }))
-                .sort((a, b) => a.name.localeCompare(b.name));
+                .sort((a, b) => {
+                    const rankDiff = preferredRank(a.id, PREFERRED_OPENROUTER_MODELS) - preferredRank(b.id, PREFERRED_OPENROUTER_MODELS);
+                    if (rankDiff !== 0) return rankDiff;
+                    return a.name.localeCompare(b.name);
+                });
 
             setOpenRouterModels(normalized);
 
             if (!normalized.some(m => m.id === openRouterModel)) {
-                const fallback = normalized.find(m => m.id === 'google/gemini-2.5-pro') || normalized[0];
+                const fallback = normalized.find(m => m.id === DEFAULT_OPENROUTER_MODEL) || normalized[0];
                 if (fallback) setOpenRouterModel(fallback.id);
             }
         } catch (error) {
@@ -166,6 +180,20 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
 
     const selectedOpenRouterModelMeta = openRouterModels.find(m => m.id === openRouterModel) || null;
     const selectedModelSupportsReasoning = Boolean(selectedOpenRouterModelMeta?.supportsReasoning);
+
+    React.useEffect(() => {
+        if (!openRouterModels.length) return;
+        if (!openRouterModels.some(m => m.id === openRouterModel)) {
+            const fallback = openRouterModels.find(m => m.id === DEFAULT_OPENROUTER_MODEL) || openRouterModels[0];
+            if (fallback) setOpenRouterModel(fallback.id);
+        }
+    }, [openRouterModel, openRouterModels]);
+
+    React.useEffect(() => {
+        if (selectedOpenRouterModelMeta && !selectedOpenRouterModelMeta.supportsReasoning && openRouterThinkingEnabled) {
+            setOpenRouterThinkingEnabled(false);
+        }
+    }, [selectedOpenRouterModelMeta, openRouterThinkingEnabled]);
 
     const handleOpenRouterModelChange = (value) => {
         setOpenRouterModel(value);
@@ -195,13 +223,17 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
                     ownedBy: m.owned_by || m.ownedBy || '',
                     created: m.created || null,
                 }))
-                .sort((a, b) => a.id.localeCompare(b.id));
+                .sort((a, b) => {
+                    const rankDiff = preferredRank(a.id, PREFERRED_OPENAI_MODELS) - preferredRank(b.id, PREFERRED_OPENAI_MODELS);
+                    if (rankDiff !== 0) return rankDiff;
+                    return a.id.localeCompare(b.id);
+                });
 
             setOpenAiModels(normalized);
             setOpenAiModelsSource(data?.source || '');
 
             if (!normalized.some(m => m.id === openAiModel)) {
-                const fallback = normalized.find(m => m.id === 'gpt-4o-mini') || normalized[0];
+                const fallback = normalized.find(m => m.id === DEFAULT_OPENAI_MODEL) || normalized[0];
                 if (fallback) setOpenAiModel(fallback.id);
             }
         } catch (error) {
@@ -217,6 +249,14 @@ export default function AiSettingsModal({ isOpen, onClose, mode = 'all' }) {
         if (!q) return true;
         return model.id.toLowerCase().includes(q) || String(model.ownedBy || '').toLowerCase().includes(q);
     });
+
+    React.useEffect(() => {
+        if (!openAiModels.length) return;
+        if (!openAiModels.some(m => m.id === openAiModel)) {
+            const fallback = openAiModels.find(m => m.id === DEFAULT_OPENAI_MODEL) || openAiModels[0];
+            if (fallback) setOpenAiModel(fallback.id);
+        }
+    }, [openAiModel, openAiModels]);
 
     // The handleSave was replaced by handleSaveAPI above
 

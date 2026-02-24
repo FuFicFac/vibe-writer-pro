@@ -14,6 +14,12 @@ function normalizeCliErrorMessage(message) {
     return text;
 }
 
+function isReasoningModelId(modelId) {
+    const id = String(modelId || '');
+    const normalized = id.includes('/') ? (id.split('/').pop() || id) : id;
+    return /^(o1|o3|o4)/.test(normalized);
+}
+
 export async function generateText({ prompt, systemPrompt, temperature = 0.7 }) {
     const state = useStore.getState();
     const settings = state.settings;
@@ -30,7 +36,7 @@ export async function generateText({ prompt, systemPrompt, temperature = 0.7 }) 
                     messages: [{ role: 'user', content: prompt }],
                     systemPrompt: systemPrompt || 'You are a helpful assistant.',
                     temperature,
-                    model: settings.openAiModel || 'gpt-4o-mini'
+                    model: settings.openAiModel || 'gpt-4.1-mini'
                 })
             });
 
@@ -53,16 +59,20 @@ export async function generateText({ prompt, systemPrompt, temperature = 0.7 }) 
     } else if (settings.openRouterApiKey) {
         // Use OpenRouter
         try {
-            const model = settings.openRouterModel || 'google/gemini-2.5-pro';
+            const model = settings.openRouterModel || 'openrouter/auto';
             const thinkingEnabled = Boolean(settings.openRouterThinkingEnabled);
             const requestBody = {
                 model,
                 messages: [
                     { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
                     { role: 'user', content: prompt }
-                ],
-                temperature
+                ]
             };
+
+            // Some routed reasoning aliases reject temperature.
+            if (!isReasoningModelId(model)) {
+                requestBody.temperature = temperature;
+            }
 
             if (thinkingEnabled) {
                 requestBody.reasoning = { effort: 'medium' };
